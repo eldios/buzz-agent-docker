@@ -1,0 +1,37 @@
+# Example stack for running a Buzz agent next to the relay under Docker
+# Compose or Portainer. Set the secrets as stack environment variables,
+# never in this file.
+#
+# Auth for Claude Code (pick one):
+#   - CLAUDE_CODE_OAUTH_TOKEN: generate on any machine with
+#     `claude setup-token` (requires a Claude subscription) and set it as a
+#     stack env var.
+#   - Interactive login: leave the token unset, run
+#     `docker exec -it <container> claude-agent-acp --cli` once and complete
+#     the login prompt; credentials persist in the agent-home volume.
+
+services:
+  agent:
+    image: ghcr.io/eldios/buzz-agent:latest
+    restart: unless-stopped
+    environment:
+      # Relay endpoint: service name when the agent joins the relay's
+      # compose network, public wss:// URL otherwise.
+      BUZZ_RELAY_URL: ${BUZZ_RELAY_URL:?}
+      # Agent identity (64-char hex private key) and NIP-OA auth tag.
+      BUZZ_PRIVATE_KEY: ${AGENT_PRIVATE_KEY:?}
+      BUZZ_AUTH_TAG: ${AGENT_AUTH_TAG:?}
+      # Owner pubkey (64-char hex), used by the respond-to=owner-only gate.
+      BUZZ_ACP_AGENT_OWNER: ${AGENT_OWNER_PUBKEY:-}
+      # Runtime: claude-agent-acp (default), codex-acp, goose (set
+      # BUZZ_ACP_AGENT_ARGS=acp), or buzz-agent for API keys, e.g.
+      # BUZZ_AGENT_PROVIDER=openrouter with OPENROUTER_API_KEY.
+      BUZZ_ACP_AGENT_COMMAND: claude-agent-acp
+      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:-}
+    volumes:
+      - agent-home:/home/agent
+      - agent-workspace:/workspace
+
+volumes:
+  agent-home:
+  agent-workspace:

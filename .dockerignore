@@ -1,0 +1,9 @@
+.git
+.github
+README.md
+LICENSE
+test
+Justfile
+flake.nix
+flake.lock
+compose.example.yaml
