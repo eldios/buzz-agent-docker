@@ -50,11 +50,12 @@ FROM node:${NODE_VERSION}-bookworm-slim
 ARG CLAUDE_ACP_VERSION
 ARG CODEX_ACP_VERSION
 
+# The base image's node user holds uid 1000, so the agent user takes 1001.
 # hadolint ignore=DL3008
 RUN apt-get update \
     && apt-get install -y --no-install-recommends bash ca-certificates curl git \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd -m -d /home/agent -s /bin/bash agent \
+    && useradd -m -d /home/agent -s /bin/bash -u 1001 agent \
     && install -d -o agent -g agent /workspace
 
 # The sprig multicall binary dispatches on argv[0]; the symlink set mirrors
@@ -89,7 +90,7 @@ ENV BUZZ_ACP_AGENT_COMMAND=claude-agent-acp \
     HOME=/home/agent
 
 WORKDIR /home/agent
-USER agent
+USER 1001:1001
 
 # /home/agent holds the agent's LLM credentials (~/.claude, ~/.codex) and
 # must persist across container recreation; /workspace holds its files.
