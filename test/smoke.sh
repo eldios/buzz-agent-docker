@@ -85,6 +85,24 @@ else
     fail "buzz-agent does not report its provider requirement"
 fi
 
+# The identity tool must generate a keypair and mint a tag that passes its
+# own verification (the script self-verifies before printing).
+keypair="$(run_in mint-auth-tag --generate)"
+agent_pub="$(grep -oE '"agent_pubkey_hex": "[0-9a-f]{64}"' <<<"$keypair" | grep -oE '[0-9a-f]{64}')"
+agent_sec="$(grep -oE '"agent_secret_hex": "[0-9a-f]{64}"' <<<"$keypair" | grep -oE '[0-9a-f]{64}')"
+if [[ -n "$agent_pub" && -n "$agent_sec" ]]; then
+    pass "mint-auth-tag generates a keypair"
+else
+    fail "mint-auth-tag does not generate a keypair"
+fi
+
+tag_out="$(docker run --rm -e OWNER_SECRET_HEX="$agent_sec" --entrypoint mint-auth-tag "$tag" "$agent_pub" 2>&1 || true)"
+if grep -q '^\["auth",' <<<"$tag_out"; then
+    pass "mint-auth-tag mints a self-verified tag"
+else
+    fail "mint-auth-tag does not mint a tag"
+fi
+
 # Without an identity the entrypoint must fail fast, not hang.
 if docker run --rm "$tag" >/dev/null 2>&1; then
     fail "entrypoint succeeded without BUZZ_PRIVATE_KEY"

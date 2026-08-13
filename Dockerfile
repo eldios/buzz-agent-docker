@@ -80,6 +80,16 @@ RUN npm install -g --omit=dev \
       "@agentclientprotocol/codex-acp@${CODEX_ACP_VERSION}" \
     && npm cache clean --force
 
+# Identity tooling lives in the image so no host ever needs npm: the mint
+# script and its pinned crypto deps are installed here, run via docker.
+COPY scripts/mint-auth-tag.mjs /opt/mint/mint-auth-tag.mjs
+WORKDIR /opt/mint
+RUN npm install --no-save "@noble/curves@2.3.0" "@noble/hashes@2.3.0" \
+    && npm cache clean --force \
+    && printf '#!/bin/sh\nexec node /opt/mint/mint-auth-tag.mjs "$@"\n' \
+       > /usr/local/bin/mint-auth-tag \
+    && chmod 0755 /usr/local/bin/mint-auth-tag
+
 COPY --chmod=0755 entrypoint.sh /usr/local/bin/entrypoint
 
 # Which agent the harness spawns. Alternatives: codex-acp, goose (with

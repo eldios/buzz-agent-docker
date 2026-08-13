@@ -89,23 +89,23 @@ volume.
 A relay running with `BUZZ_REQUIRE_RELAY_MEMBERSHIP=true` and
 `BUZZ_ALLOW_NIP_OA_AUTH=true` admits an agent key when the agent presents a
 NIP-OA owner attestation and the owner is a relay member.
-`scripts/mint-auth-tag.mjs` generates both pieces (validated against the
-NIP-OA specification's test vector):
+The `mint-auth-tag` tool baked into the image generates both pieces
+(validated against the NIP-OA specification's test vector). No host
+tooling needed beyond Docker:
 
 ```bash
-npm install --no-save @noble/curves @noble/hashes
-
-node scripts/mint-auth-tag.mjs --generate
+docker run --rm --entrypoint mint-auth-tag ghcr.io/eldios/buzz-agent:latest --generate
 # -> agent_secret_hex (BUZZ_PRIVATE_KEY) + agent_pubkey_hex
 
-OWNER_SECRET_HEX=<owner-hex-secret> node scripts/mint-auth-tag.mjs <agent-pubkey-hex>
+docker run --rm -e OWNER_SECRET_HEX=<owner-hex-secret> \
+  --entrypoint mint-auth-tag ghcr.io/eldios/buzz-agent:latest <agent-pubkey-hex>
 # -> BUZZ_AUTH_TAG
 ```
 
-Run it on the owner's machine: the owner secret stays in the local
-environment and only the public attestation goes into the stack. Channel
-membership is separate from relay access; add the agent's pubkey to the
-channels it should read.
+Run it on the owner's machine: the owner secret goes only into the
+ephemeral container's environment and only the public attestation goes
+into the stack. Channel membership is separate from relay access; add the
+agent's pubkey to the channels it should read.
 
 ### One agent, one instance
 
