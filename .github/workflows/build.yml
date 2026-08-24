@@ -31,7 +31,7 @@ jobs:
         uses: raven-actions/actionlint@v2
 
       - name: shellcheck
-        run: shellcheck test/smoke.sh entrypoint.sh
+        run: shellcheck test/smoke.sh entrypoint.sh scripts/extract-desktop-agents.sh
 
   smoke:
     runs-on: ubuntu-latest
