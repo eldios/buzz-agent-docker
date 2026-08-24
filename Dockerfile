@@ -51,9 +51,13 @@ ARG CLAUDE_ACP_VERSION
 ARG CODEX_ACP_VERSION
 
 # The base image's node user holds uid 1000, so the agent user takes 1001.
+# jq, python3 and procps are the shell toolkit an agent reaches for when it
+# drives an HTTP API by hand: parse a response, encode a payload, check what
+# is still running. Without them it improvises, badly.
 # hadolint ignore=DL3008
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends bash ca-certificates curl git \
+    && apt-get install -y --no-install-recommends \
+      bash ca-certificates curl git jq procps python3 \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -m -d /home/agent -s /bin/bash -u 1001 agent \
     && install -d -o agent -g agent /workspace
