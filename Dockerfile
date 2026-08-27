@@ -51,13 +51,24 @@ ARG CLAUDE_ACP_VERSION
 ARG CODEX_ACP_VERSION
 
 # The base image's node user holds uid 1000, so the agent user takes 1001.
-# jq, python3 and procps are the shell toolkit an agent reaches for when it
-# drives an HTTP API by hand: parse a response, encode a payload, check what
-# is still running. Without them it improvises, badly.
+#
+# The package set is what an agent reaches for when it drives an API or handles
+# a file by hand. A missing tool does not stop it: it reimplements the tool in
+# the shell, badly, and spends the turn doing so.
+#   shell and HTTP   bash curl wget jq file less bc procps
+#   python           python3 python3-requests python3-pil
+#   images           imagemagick libjpeg-turbo-progs optipng libimage-exiftool-perl
+#   audio and video  ffmpeg
+#   archives         unzip zip xz-utils
+#   data             sqlite3
+#   reachability     iputils-ping netcat-openbsd dnsutils
 # hadolint ignore=DL3008
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-      bash ca-certificates curl git jq procps python3 \
+      bash bc ca-certificates curl dnsutils ffmpeg file git imagemagick \
+      iputils-ping jq less libimage-exiftool-perl libjpeg-turbo-progs \
+      netcat-openbsd optipng procps python3 python3-pil python3-requests \
+      sqlite3 unzip wget xz-utils zip \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -m -d /home/agent -s /bin/bash -u 1001 agent \
     && install -d -o agent -g agent /workspace
