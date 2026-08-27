@@ -107,12 +107,17 @@ RUN npm install --no-save "@noble/curves@2.3.0" "@noble/hashes@2.3.0" \
 
 COPY --chmod=0755 entrypoint.sh /usr/local/bin/entrypoint
 
+# A login shell rebuilds PATH from /etc/profile and would drop /opt/agent-tools,
+# where the deployment mounts the tools an agent is expected to call by name.
+COPY --chmod=0644 profile.d/agent-tools.sh /etc/profile.d/agent-tools.sh
+
 # Which agent the harness spawns. Alternatives: codex-acp, goose (with
 # BUZZ_ACP_AGENT_ARGS=acp), or buzz-agent for API-key providers including
 # OpenRouter.
 ENV BUZZ_ACP_AGENT_COMMAND=claude-agent-acp \
     BUZZ_ACP_AGENT_ARGS="" \
-    HOME=/home/agent
+    HOME=/home/agent \
+    PATH=/opt/agent-tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 WORKDIR /home/agent
 USER 1001:1001

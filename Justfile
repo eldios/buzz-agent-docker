@@ -16,7 +16,7 @@ ci: lint build test
 lint:
     hadolint {{dockerfile}}
     actionlint
-    shellcheck test/smoke.sh entrypoint.sh scripts/extract-desktop-agents.sh
+    shellcheck test/smoke.sh entrypoint.sh scripts/extract-desktop-agents.sh profile.d/agent-tools.sh
 
 # Build the image
 build:
