@@ -12,9 +12,11 @@
 # installs locally; Goose comes from its official release tarball.
 
 ARG NODE_VERSION=24
-ARG CLAUDE_ACP_VERSION=0.66.0
-ARG CODEX_ACP_VERSION=1.2.0
-ARG GOOSE_VERSION=1.46.0
+ARG CLAUDE_ACP_VERSION=0.84.0
+ARG CODEX_ACP_VERSION=2.0.0
+ARG GOOSE_VERSION=1.52.0
+ARG NOBLE_CURVES_VERSION=2.4.0
+ARG NOBLE_HASHES_VERSION=2.4.0
 
 # Upstream publishes only moving tags (main, sha-*); the digest is the pin.
 FROM ghcr.io/block/buzz-sprig:main@sha256:77757a96883d2560f9dfce9eb4ce2ea50e890ab948e8473956dafe39087c91f1 AS sprig
@@ -49,6 +51,8 @@ FROM node:${NODE_VERSION}-bookworm-slim
 
 ARG CLAUDE_ACP_VERSION
 ARG CODEX_ACP_VERSION
+ARG NOBLE_CURVES_VERSION
+ARG NOBLE_HASHES_VERSION
 
 # The base image's node user holds uid 1000, so the agent user takes 1001.
 #
@@ -99,7 +103,7 @@ RUN npm install -g --omit=dev \
 # script and its pinned crypto deps are installed here, run via docker.
 COPY scripts/mint-auth-tag.mjs /opt/mint/mint-auth-tag.mjs
 WORKDIR /opt/mint
-RUN npm install --no-save "@noble/curves@2.3.0" "@noble/hashes@2.3.0" \
+RUN npm install --no-save "@noble/curves@${NOBLE_CURVES_VERSION}" "@noble/hashes@${NOBLE_HASHES_VERSION}" \
     && npm cache clean --force \
     && printf '#!/bin/sh\nexec node /opt/mint/mint-auth-tag.mjs "$@"\n' \
        > /usr/local/bin/mint-auth-tag \
