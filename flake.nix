@@ -25,9 +25,10 @@
           shellcheck
           act
 
-          # Used by the version-checking recipe.
+          # Used by the version-checking and bump recipes.
           curl
           jq
+          python3
         ];
 
         shellHook = ''

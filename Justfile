@@ -1,5 +1,6 @@
 # buzz-agent-docker task runner. Run `just` for the list; the dev shell
-# (flake.nix) provides just, hadolint, actionlint, shellcheck, act, curl, jq.
+# (flake.nix) provides just, hadolint, actionlint, shellcheck, act, curl, jq,
+# python3.
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
@@ -17,6 +18,7 @@ lint:
     hadolint {{dockerfile}}
     actionlint
     shellcheck test/smoke.sh entrypoint.sh scripts/extract-desktop-agents.sh profile.d/agent-tools.sh
+    python3 -m py_compile scripts/bump-pins.py
 
 # Build the image
 build:
@@ -39,19 +41,11 @@ workflow-parse:
 shell:
     docker run --rm -it --entrypoint bash {{image}}:test
 
-# Compare the pinned adapter versions and sprig digest against upstream
+# Compare the pinned runtimes and the sprig digest against upstream
 check-versions:
     #!/usr/bin/env bash
     set -euo pipefail
-    for pkg in CLAUDE_ACP:claude-agent-acp CODEX_ACP:codex-acp; do
-        arg="${pkg%%:*}_VERSION"; name="${pkg##*:}"
-        pinned="$(grep -oE "^ARG ${arg}=.*" {{dockerfile}} | cut -d= -f2)"
-        latest="$(curl -fsSL "https://registry.npmjs.org/@agentclientprotocol%2F${name}" | jq -r '.["dist-tags"].latest')"
-        printf '%-18s pinned %-8s latest %s\n' "$name" "$pinned" "$latest"
-    done
-    goose_pinned="$(grep -oE '^ARG GOOSE_VERSION=.*' {{dockerfile}} | cut -d= -f2)"
-    goose_latest="$(curl -fsSL https://api.github.com/repos/block/goose/releases/latest | jq -r .tag_name)"
-    printf '%-18s pinned %-8s latest %s\n' "goose" "$goose_pinned" "${goose_latest#v}"
+    scripts/bump-pins.py check
     pinned_digest="$(grep -oE 'buzz-sprig:main@[a-z0-9:]+' {{dockerfile}} | cut -d@ -f2)"
     token="$(curl -fsSL "https://ghcr.io/token?scope=repository:block/buzz-sprig:pull" | jq -r .token)"
     latest_digest="$(curl -fsSI -H "Authorization: Bearer $token" \
@@ -59,3 +53,8 @@ check-versions:
         "https://ghcr.io/v2/block/buzz-sprig/manifests/main" \
         | grep -i docker-content-digest | tr -d '\r' | awk '{print $2}')"
     printf '%-18s pinned %s\n%-18s latest %s\n' "sprig" "$pinned_digest" "" "$latest_digest"
+
+# Move the runtime pins to the newest release of their major (what the nightly
+# auto-update workflow runs); sprig moves by hand, together with the relay
+bump:
+    scripts/bump-pins.py update

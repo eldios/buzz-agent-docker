@@ -33,6 +33,9 @@ jobs:
       - name: shellcheck
         run: shellcheck test/smoke.sh entrypoint.sh scripts/extract-desktop-agents.sh profile.d/agent-tools.sh
 
+      - name: python
+        run: python3 -m py_compile scripts/bump-pins.py
+
   smoke:
     runs-on: ubuntu-latest
     needs: lint

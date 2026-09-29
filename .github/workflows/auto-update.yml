@@ -1,0 +1,117 @@
+name: auto-update
+
+# Nightly bump of the pinned runtimes (scripts/bump-pins.py): minor and patch
+# releases at least three days old. A passing lint, build and smoke test
+# commits the Dockerfile to main, tags the next patch release and dispatches
+# the build workflow, which publishes it. A new major or a failed run opens an
+# issue instead.
+#
+# The commit goes through the contents API so GitHub signs it. Tags pushed by
+# GITHUB_TOKEN start no workflow, hence the explicit dispatch.
+# No step interpolates event-controlled data into a shell.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auto-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Every tag, to compute the next release.
+          fetch-depth: 0
+
+      - name: Bump pins
+        id: bump
+        run: scripts/bump-pins.py update
+
+      - name: Report new majors
+        if: steps.bump.outputs.majors != ''
+        env:
+          MAJORS: ${{ steps.bump.outputs.majors }}
+        run: |
+          while IFS= read -r line; do
+            [ -n "$line" ] || continue
+            title="Major update available: $line"
+            open="$(gh issue list --repo "$REPO" --state open --search "in:title \"$title\"" --json title \
+              | jq --arg t "$title" 'map(select(.title == $t)) | length')"
+            if [ "$open" = "0" ]; then
+              gh issue create --repo "$REPO" --title "$title" \
+                --body "scripts/bump-pins.py only moves pins within their major. Review the upstream changes, bump the ARG by hand and cut a release."
+            fi
+          done <<< "$MAJORS"
+
+      - name: Lint
+        if: steps.bump.outputs.changed == 'true'
+        uses: hadolint/hadolint-action@v3.5.0
+        with:
+          dockerfile: Dockerfile
+
+      - uses: docker/setup-buildx-action@v4
+        if: steps.bump.outputs.changed == 'true'
+
+      - name: Build
+        if: steps.bump.outputs.changed == 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          load: true
+          tags: buzz-agent-local:test
+
+      - name: Smoke test
+        if: steps.bump.outputs.changed == 'true'
+        run: ./test/smoke.sh
+        env:
+          IMAGE: buzz-agent-local
+
+      - name: Commit, tag and release
+        if: steps.bump.outputs.changed == 'true'
+        env:
+          SUMMARY: ${{ steps.bump.outputs.summary }}
+        run: |
+          last="$(git tag --list 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1)"
+          IFS=. read -r major minor patch <<< "${last#v}"
+          tag="v${major}.${minor}.$((patch + 1))"
+          message="$(printf 'chore(image): bump the agent runtimes\n\n%s\n\nAutomatic update, released as %s.' "$SUMMARY" "$tag")"
+          # The blob sha pins the update to the main this run checked out:
+          # if main moved meanwhile, the API rejects the commit.
+          blob="$(git rev-parse HEAD:Dockerfile)"
+          commit="$(gh api -X PUT "repos/$REPO/contents/Dockerfile" \
+            -f message="$message" -f branch=main -f sha="$blob" \
+            -f content="$(base64 -w0 Dockerfile)" --jq .commit.sha)"
+          gh api "repos/$REPO/git/refs" -f ref="refs/tags/$tag" -f sha="$commit" >/dev/null
+          gh workflow run build.yml --repo "$REPO" --ref "$tag"
+          echo "Released $tag from $commit" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report failure
+        if: failure()
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Automatic runtime update failed"
+          number="$(gh issue list --repo "$REPO" --state open --search "in:title \"$title\"" --json number,title \
+            | jq -r --arg t "$title" 'map(select(.title == $t)) | .[0].number // empty')"
+          if [ -z "$number" ]; then
+            gh issue create --repo "$REPO" --title "$title" --body "Run: $RUN_URL"
+          else
+            gh issue comment "$number" --repo "$REPO" --body "Failed again: $RUN_URL"
+          fi
